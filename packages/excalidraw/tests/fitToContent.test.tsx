@@ -1,12 +1,15 @@
 import React from "react";
+import { vi } from "vitest";
 
 import { Excalidraw } from "../index";
+import { SCROLL_TO_CONTENT_ANIMATION_KEY } from "../components/App.viewport";
 import { AnimationController } from "../renderer/animation";
 import { getNormalizedZoom } from "../scene";
-import { SCROLL_TO_CONTENT_ANIMATION_KEY } from "../viewport";
 
 import { API } from "./helpers/api";
 import { act, render } from "./test-utils";
+
+import type { SocketId } from "../types";
 
 const { h } = window;
 
@@ -80,7 +83,7 @@ describe("scale-down", () => {
     expect(h.state.zoom.value).toBe(1);
 
     act(() => {
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: rectElement,
         fit: "scale-down",
         animation: false,
@@ -116,7 +119,7 @@ describe("scale-down", () => {
     expect(h.state.zoom.value).toBe(1);
 
     act(() => {
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: [topLeft, bottomRight],
         fit: "scale-down",
         animation: false,
@@ -147,7 +150,7 @@ describe("scale-down", () => {
 
     act(() => {
       // navigating by element id (a string target) with zoomToFit
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: rectElement.id,
         fit: "scale-down",
         animation: false,
@@ -178,7 +181,7 @@ describe("scale-down", () => {
     expect(h.state.scrollY).toBe(0);
 
     act(() => {
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: rectElement,
         fit: "contain",
         animation: false,
@@ -213,7 +216,7 @@ describe("none", () => {
     });
 
     act(() => {
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: rectElement,
         fit: "none",
         animation: false,
@@ -226,6 +229,45 @@ describe("none", () => {
     // (scroll = viewportSize / 2 / zoom - sceneCenter)
     expect(h.state.scrollX).toBeCloseTo(100 / 2 / 0.5 - 1025);
     expect(h.state.scrollY).toBeCloseTo(100 / 2 / 0.5 - 1025);
+  });
+});
+
+describe("following a collaborator", () => {
+  const userToFollow = { socketId: "socket-1" as SocketId, username: "Ann" };
+
+  it("should stop following when navigating", async () => {
+    const onUserFollow = vi.fn();
+    await render(
+      <Excalidraw userToFollow={userToFollow} onUserFollow={onUserFollow} />,
+    );
+    const rectElement = API.createElement({ x: 1000, y: 1000 });
+    API.setElements([rectElement]);
+
+    act(() => {
+      h.app.viewport.setViewport({ target: rectElement, animation: false });
+    });
+
+    expect(onUserFollow).toHaveBeenCalledTimes(1);
+    expect(onUserFollow).toHaveBeenCalledWith({
+      userToFollow,
+      action: "UNFOLLOW",
+    });
+  });
+
+  it("should keep following when not navigating", async () => {
+    const onUserFollow = vi.fn();
+    await render(
+      <Excalidraw userToFollow={userToFollow} onUserFollow={onUserFollow} />,
+    );
+
+    act(() => {
+      // clears a lock; the view stays where it is
+      h.app.viewport.setViewport(null);
+      // resolves to nothing
+      h.app.viewport.setViewport({ target: "missing-id", animation: false });
+    });
+
+    expect(onUserFollow).not.toHaveBeenCalled();
   });
 });
 
@@ -258,7 +300,7 @@ describe("scale-down animated", () => {
     API.setElements([rectElement]);
 
     act(() => {
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: rectElement,
         fit: "scale-down",
         animation: { duration: LONG_ANIMATION_DURATION },
@@ -302,7 +344,7 @@ describe("scale-down animated", () => {
     expect(h.state.scrollY).toBe(0);
 
     act(() => {
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: rectElement,
         fit: "scale-down",
         animation: { duration: LONG_ANIMATION_DURATION },
@@ -339,7 +381,7 @@ describe("scale-down animated", () => {
 
     act(() => {
       // a short duration so the animation completes within a few frames
-      h.app.setViewport({
+      h.app.viewport.setViewport({
         target: rectElement,
         fit: "scale-down",
         animation: { duration: 10 },
